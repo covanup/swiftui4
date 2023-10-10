@@ -1,67 +1,86 @@
 import SwiftUI
 
 struct ContentView: View {
-    @State private var id = 0
-    @State private var pressed = false
-    @State private var animate = false
-    private let size = 44.0
-    
     var body: some View {
-        Button {
-            pressed = true
-            animate = true
-            id += 1
-            Task {
-                try await Task.sleep(for: .seconds(1))
-                pressed = false
+        VStack {
+            VStack {
+                ButtonView()
+                    .buttonStyle(ButtonStyle())
+                    .frame(width: 100, height: 100)
+                    .foregroundColor(.blue)
             }
-        } label: {
-            ForwardImageView(animate: $animate, size: size)
-                .id(id)
-                .frame(width: size * 2 + 8, height: size * 2 + 8)
-                .animation(.spring(response: 0.2, dampingFraction: 0.6), value: pressed)
         }
-        .contentShape(Rectangle())
-        .onTapGesture { }
+        .fixedSize()
     }
 }
 
-struct ForwardImageView: View {
-    @Binding var animate: Bool
-    @State private var triger: Bool = false
-    let size: CGFloat
-    
+struct ButtonView: View {
+    @State private var animate = false
+
     var body: some View {
-        let frameWidth = size * 2 - size / 5
-        
-        ZStack {
-            VStack {
-                image()
-                    .scaleEffect(triger ? 0 : 1)
-                    .offset(x: triger ? size * 0.7 : 0)
-                    .opacity(triger ? 0 : 1)
+        Button {
+            if !animate {
+                withAnimation(.interpolatingSpring(stiffness: 200, damping: 14)) {
+                    animate = true
+                } completion: {
+                    animate = false
+                }
             }
-            .frame(width: frameWidth, alignment: .trailing)
-            
-            VStack {
-                image()
-                    .scaleEffect(triger ? 1 : 0)
-                    .offset(x: triger ? 0 : -size * 0.7)
+        } label: {
+            GeometryReader { proxy in
+                let width = proxy.size.width / 2
+                let systemName = "play.fill"
+
+                HStack(alignment: .center, spacing: 0) {
+                    Image(systemName: systemName)
+                        .renderingMode(.template)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: animate ? width : .zero)
+                        .opacity(animate ? 1 : .zero)
+
+                    Image(systemName: systemName)
+                        .renderingMode(.template)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: width)
+
+                    Image(systemName: systemName)
+                        .renderingMode(.template)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: animate ? 0.5 : width)
+                        .opacity(animate ? .zero : 1)
+                }
+                .frame(maxHeight: .infinity, alignment: .center)
             }
-            .frame(width: frameWidth, alignment: .leading)
-            
-            VStack {
-                image()
-            }
-            .frame(width: frameWidth, alignment: !triger ? .leading : .trailing)
         }
-        .animation(.spring(response: 1.0, dampingFraction: 0.5), value: triger)
-        .onAppear { if animate { triger = true } }
     }
+}
+
+struct ButtonStyle: PrimitiveButtonStyle {
+    let scale = 0.86
+    let duration = 0.22
     
-    private func image() -> some View {
-        Image(systemName: "arrowtriangle.forward.fill")
-            .font(.system(size: size))
-            .foregroundStyle(.blue)
+    @State private var animate: Bool = false
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(animate ? scale : 1)
+            .overlay {
+                Circle()
+                    .foregroundColor(.black)
+                    .opacity(animate ? 0.1 : 0)
+                    .padding(-12)
+            }
+            .animation(.spring(duration: duration), value: animate)
+            .onTapGesture {
+                guard !animate else { return }
+                animate.toggle()
+                configuration.trigger()
+                DispatchQueue.main.asyncAfter(deadline: .now() + duration) {
+                    animate = false
+                }
+            }
     }
 }
